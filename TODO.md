@@ -4,7 +4,7 @@ Lo que falta implementar (~20% de la API). Todo tiene instrucciones detalladas e
 
 ---
 
-## 1. Valoraciones ⭐
+## 1. Valoraciones 
 **Archivos:** `src/controllers/valoraciones.controller.js` · `src/services/valoraciones.service.js` · `src/routes/valoraciones.routes.js`
 
 | Endpoint | Método | Auth | Descripción |
@@ -16,7 +16,7 @@ Lo que falta implementar (~20% de la API). Todo tiene instrucciones detalladas e
 
 ---
 
-## 2. Panel de Administración 🛠️
+## 2. Panel de Administración 
 **Archivos:** `src/controllers/admin.controller.js` · `src/services/admin.service.js` · `src/routes/admin.routes.js`
 
 | Endpoint | Método | Descripción |
@@ -31,7 +31,7 @@ Lo que falta implementar (~20% de la API). Todo tiene instrucciones detalladas e
 
 ---
 
-## 3. Notificaciones — marcar todas como leídas 🔔
+## 3. Notificaciones — marcar todas como leídas 
 **Archivo:** `src/services/notificaciones.service.js`
 
 Agregar función:
@@ -51,7 +51,7 @@ router.patch('/leer-todas', ctrl.marcarTodasLeidas);
 
 ---
 
-## 4. Categorías — CRUD admin 📁
+## 4. Categorías — CRUD admin
 **Archivo:** `src/routes/categorias.routes.js` · `src/controllers/categorias.controller.js`
 
 Agregar endpoints protegidos con `auth + isAdmin`:
@@ -61,7 +61,7 @@ Agregar endpoints protegidos con `auth + isAdmin`:
 
 ---
 
-## 5. Auth avanzado (opcional) 🔐
+## 5. Auth avanzado
 Si se quiere implementar blacklist de tokens al hacer logout:
 - Crear tabla `token_blacklist (token_hash VARCHAR, expires_at TIMESTAMPTZ)`
 - En `logout`, insertar `SHA256(token)` con la expiración del JWT
