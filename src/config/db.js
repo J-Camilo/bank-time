@@ -1,9 +1,11 @@
 const { Pool } = require('pg');
 
+const isServerless = !!process.env.VERCEL;
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
-  max: 20,
+  max: isServerless ? 1 : 20,
   idleTimeoutMillis: 30_000,
   connectionTimeoutMillis: 10_000,
 });

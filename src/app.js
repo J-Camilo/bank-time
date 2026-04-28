@@ -45,10 +45,12 @@ app.use((_, res) => res.status(404).json({ error: 'Ruta no encontrada' }));
 // ── Global error handler ─────────────────────────────────────
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`\n🚀 Banco de Tiempo API corriendo en http://localhost:${PORT}/api/v1`);
-  console.log(`   Modo: ${process.env.NODE_ENV || 'development'}\n`);
-});
+if (require.main === module) {
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, () => {
+    console.log(`\n🚀 Banco de Tiempo API corriendo en http://localhost:${PORT}/api/v1`);
+    console.log(`   Modo: ${process.env.NODE_ENV || 'development'}\n`);
+  });
+}
 
 module.exports = app;
