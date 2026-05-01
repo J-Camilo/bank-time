@@ -1,9 +1,11 @@
-const router = require('express').Router();
-const ctrl   = require('../controllers/categorias.controller');
+const router  = require('express').Router();
+const auth    = require('../middlewares/auth.middleware');
+const isAdmin = require('../middlewares/admin.middleware');
+const ctrl    = require('../controllers/categorias.controller');
 
 router.get('/', ctrl.listar);
-// TODO: POST / → crear categoría (admin) → ver TODO.md
-// TODO: PUT /:id → editar categoría (admin) → ver TODO.md
-// TODO: DELETE /:id → eliminar categoría (admin) → ver TODO.md
+router.post('/',     auth, isAdmin, ctrl.crear);
+router.put('/:id',   auth, isAdmin, ctrl.actualizar);
+router.delete('/:id', auth, isAdmin, ctrl.eliminar);
 
 module.exports = router;

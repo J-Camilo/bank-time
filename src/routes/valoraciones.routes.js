@@ -1,9 +1,8 @@
 const router = require('express').Router();
 const auth   = require('../middlewares/auth.middleware');
-// const ctrl = require('../controllers/valoraciones.controller'); // TODO: descomentar
+const ctrl   = require('../controllers/valoraciones.controller');
 
-// TODO: Implementar el controller y descomentar estas rutas
-// router.post('/', auth, ctrl.crear);
-// router.get('/usuario/:id', ctrl.listarPorUsuario);
+router.post('/',             auth, ctrl.crear);
+router.get('/usuario/:id',        ctrl.listarPorUsuario);
 
 module.exports = router;
