@@ -7,11 +7,14 @@ const autoExpirar = () =>
               WHERE estado = 'ABIERTO' AND fecha_expiracion < CURRENT_DATE`);
 
 const create = async (usuarioId, { titulo, descripcion, categoria_id, fecha_expiracion, creditos_hora = 1 }) => {
+  if (!categoria_id || !Number.isInteger(Number(categoria_id))) {
+    throw new AppError('categoria_id es requerida y debe ser un número válido', 400);
+  }
   const { rows: [pub] } = await pool.query(
     `INSERT INTO publicaciones (titulo, descripcion, categoria_id, fecha_expiracion, creditos_hora, usuario_id)
      VALUES ($1, $2, $3, $4, $5, $6)
      RETURNING *`,
-    [titulo, descripcion, categoria_id || null, fecha_expiracion, creditos_hora, usuarioId]
+    [titulo, descripcion, Number(categoria_id), fecha_expiracion, creditos_hora, usuarioId]
   );
   return pub;
 };
@@ -19,7 +22,9 @@ const create = async (usuarioId, { titulo, descripcion, categoria_id, fecha_expi
 const findAll = async ({ categoria_id, page = 1, limit = 10 } = {}) => {
   await autoExpirar();
 
-  const offset = (parseInt(page) - 1) * parseInt(limit);
+  const safePage = Math.max(1, parseInt(page) || 1);
+  const safeLimit = Math.max(1, parseInt(limit) || 10);
+  const offset = (safePage - 1) * safeLimit;
   const params = [];
   let where = "p.estado = 'ABIERTO'";
 
@@ -42,11 +47,11 @@ const findAll = async ({ categoria_id, page = 1, limit = 10 } = {}) => {
   const countQuery = `SELECT COUNT(*) FROM publicaciones p WHERE ${where}`;
 
   const [{ rows: data }, { rows: [{ count }] }] = await Promise.all([
-    pool.query(dataQuery, [...params, parseInt(limit), offset]),
+    pool.query(dataQuery, [...params, safeLimit, offset]),
     pool.query(countQuery, params),
   ]);
 
-  return { data, total: parseInt(count), page: parseInt(page), limit: parseInt(limit) };
+  return { data, total: parseInt(count), page: safePage, limit: safeLimit };
 };
 
 const findById = async (id) => {

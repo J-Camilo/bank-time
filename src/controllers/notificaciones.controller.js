@@ -1,4 +1,3 @@
-// src/controllers/notificaciones.controller.js
 const svc = require('../services/notificaciones.service');
 
 const listar = async (req, res, next) => {
@@ -16,6 +15,11 @@ const marcarLeida = async (req, res, next) => {
   } catch (e) { next(e); }
 };
 
-// TODO: marcarTodasLeidas → ver TODO.md
+const marcarTodasLeidas = async (req, res, next) => {
+  try {
+    await svc.marcarTodasLeidas(req.user.id);
+    res.json({ message: 'Todas las notificaciones marcadas como leídas' });
+  } catch (e) { next(e); }
+};
 
-module.exports = { listar, marcarLeida };
+module.exports = { listar, marcarLeida, marcarTodasLeidas };

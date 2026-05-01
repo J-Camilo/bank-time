@@ -28,8 +28,8 @@ npm run dev
 | Match | `GET /publicaciones/:id/matches` |  Completo |
 | Notificaciones | `/api/v1/notificaciones` |  Completo |
 | Categorías | `GET /api/v1/categorias` |  Read only |
-| **Valoraciones** | `/api/v1/valoraciones` | **TODO** |
-| **Admin** | `/api/v1/admin` | **TODO** |
+| Valoraciones | `/api/v1/valoraciones` | Completo |
+| Admin | `/api/v1/admin` | Completo |
 
 
 ## Estructura del proyecto
@@ -53,9 +53,18 @@ src/
 │   ├── solicitudes.service.js
 │   ├── intercambios.service.js
 │   ├── match.service.js
-│   └── notificaciones.service.js
+│   ├── notificaciones.service.js
+│   ├── valoraciones.service.js
+│   └── admin.service.js
 ├── controllers/              # Request/response handling
 └── routes/                   # Express routers
+
+## Documentación
+
+Ver carpeta [`docs/`](./docs/):
+- [`docs/api.md`](./docs/api.md) — Referencia completa de endpoints
+- [`docs/architecture.md`](./docs/architecture.md) — Arquitectura y decisiones de diseño
+- [`docs/setup.md`](./docs/setup.md) — Guía de instalación y pruebas
 ```
 
 .env 

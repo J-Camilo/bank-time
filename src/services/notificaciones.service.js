@@ -44,9 +44,11 @@ const marcarLeida = async (notificacionId, usuarioId) => {
   return rowCount > 0;
 };
 
-// ─────────────────────────────────────────────────────────────
-// TODO: marcarTodasLeidas
-// Ver instrucciones en TODO.md → sección "Notificaciones"
-// ─────────────────────────────────────────────────────────────
+const marcarTodasLeidas = async (usuarioId) => {
+  await pool.query(
+    'UPDATE notificaciones SET leida = TRUE WHERE usuario_id = $1 AND leida = FALSE',
+    [usuarioId]
+  );
+};
 
-module.exports = { crearNotificacion, listarPorUsuario, marcarLeida };
+module.exports = { crearNotificacion, listarPorUsuario, marcarLeida, marcarTodasLeidas };
