@@ -36,7 +36,19 @@ const listarMios = async (usuarioId, { estado } = {}) => {
   }
 
   const { rows } = await pool.query(
-    `${BASE_SELECT}
+    `SELECT
+       i.*,
+       p.titulo     AS publicacion_titulo,
+       prest.nombre AS prestador_nombre, prest.apellido AS prestador_apellido,
+       rec.nombre   AS receptor_nombre,  rec.apellido   AS receptor_apellido,
+       EXISTS(
+         SELECT 1 FROM valoraciones v
+         WHERE v.intercambio_id = i.id AND v.usuario_id = $1
+       ) AS ya_valore
+     FROM intercambios i
+     JOIN publicaciones p     ON p.id     = i.publicacion_id
+     JOIN usuarios      prest ON prest.id = i.prestador_id
+     JOIN usuarios      rec   ON rec.id   = i.receptor_id
      WHERE (i.prestador_id = $1 OR i.receptor_id = $1)
      ${filter}
      ORDER BY i.fecha_acordada DESC`,
