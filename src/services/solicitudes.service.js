@@ -25,6 +25,14 @@ const crear = async (usuarioId, { publicacion_id, mensaje, fecha_propuesta }) =>
       throw new AppError('Créditos insuficientes para solicitar este servicio', 400);
     }
 
+    // ── Check no active pending solicitud ─────────────────────
+    const { rows: [existing] } = await client.query(
+      `SELECT id FROM solicitud_interes
+       WHERE publicacion_id = $1 AND usuario_id = $2 AND estado = 'PENDIENTE'`,
+      [publicacion_id, usuarioId]
+    );
+    if (existing) throw new AppError('Ya tenés una solicitud pendiente para esta publicación', 409);
+
     // ── Create solicitud ──────────────────────────────────────
     const { rows: [solicitud] } = await client.query(
       `INSERT INTO solicitud_interes (publicacion_id, usuario_id, mensaje, fecha_propuesta)
@@ -163,4 +171,40 @@ const rechazar = async (solicitudId, usuarioId) => {
   });
 };
 
-module.exports = { crear, listarRecibidas, listarEnviadas, aceptar, rechazar };
+const cancelar = async (solicitudId, usuarioId) => {
+  const { rows: [solicitud] } = await pool.query(
+    `SELECT id, usuario_id, estado FROM solicitud_interes WHERE id = $1`,
+    [solicitudId]
+  );
+  if (!solicitud)                          throw new AppError('Solicitud no encontrada', 404);
+  if (solicitud.usuario_id !== usuarioId)  throw new AppError('No tenés permiso sobre esta solicitud', 403);
+  if (solicitud.estado !== 'PENDIENTE')    throw new AppError('Solo podés descartar solicitudes pendientes', 400);
+
+  await pool.query(
+    "UPDATE solicitud_interes SET estado = 'CANCELADA' WHERE id = $1",
+    [solicitudId]
+  );
+  return { message: 'Solicitud descartada correctamente' };
+};
+
+const actualizar = async (solicitudId, usuarioId, { fecha_propuesta, mensaje }) => {
+  const { rows: [solicitud] } = await pool.query(
+    'SELECT id, usuario_id, estado FROM solicitud_interes WHERE id = $1',
+    [solicitudId]
+  );
+  if (!solicitud)                          throw new AppError('Solicitud no encontrada', 404);
+  if (solicitud.usuario_id !== usuarioId)  throw new AppError('No tenés permiso sobre esta solicitud', 403);
+  if (solicitud.estado !== 'PENDIENTE')    throw new AppError('Solo podés modificar solicitudes pendientes', 400);
+
+  const { rows: [updated] } = await pool.query(
+    `UPDATE solicitud_interes
+     SET fecha_propuesta = COALESCE($1, fecha_propuesta),
+         mensaje         = COALESCE($2, mensaje)
+     WHERE id = $3
+     RETURNING *`,
+    [fecha_propuesta || null, mensaje !== undefined ? mensaje : null, solicitudId]
+  );
+  return updated;
+};
+
+module.exports = { crear, listarRecibidas, listarEnviadas, aceptar, rechazar, cancelar, actualizar };

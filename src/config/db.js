@@ -16,7 +16,8 @@ pool.on('error', (err) => {
   process.exit(-1);
 });
 
-pool.on('connect', () => {
+pool.on('connect', (client) => {
+  client.query("SET client_encoding TO 'UTF8'");
   if (process.env.NODE_ENV !== 'production') console.log('🗄️  DB conectada');
 });
 
