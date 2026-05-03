@@ -28,6 +28,13 @@ const findById = async (id, usuarioId) => {
 };
 
 const listarMios = async (usuarioId, { estado } = {}) => {
+  // Auto-transition: if fecha_acordada already passed, move EN_ESPERA → EN_CURSO
+  await pool.query(
+    `UPDATE intercambios
+     SET estado = 'EN_CURSO'
+     WHERE estado = 'EN_ESPERA' AND fecha_acordada <= NOW()`
+  );
+
   const params = [usuarioId];
   let filter = '';
   if (estado) {
