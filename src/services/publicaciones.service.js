@@ -19,19 +19,31 @@ const create = async (usuarioId, { titulo, descripcion, categoria_id, fecha_expi
   return pub;
 };
 
-const findAll = async ({ categoria_id, page = 1, limit = 10 } = {}) => {
+const findAll = async ({ categoria_id, categoria_ids, page = 1, limit = 10, sort_by = 'recientes' } = {}) => {
   await autoExpirar();
 
-  const safePage = Math.max(1, parseInt(page) || 1);
+  const safePage  = Math.max(1, parseInt(page)  || 1);
   const safeLimit = Math.max(1, parseInt(limit) || 10);
-  const offset = (safePage - 1) * safeLimit;
-  const params = [];
-  let where = "p.estado = 'ABIERTO'";
+  const offset    = (safePage - 1) * safeLimit;
+  const params    = [];
+  let where       = "p.estado = 'ABIERTO'";
 
-  if (categoria_id) {
-    params.push(parseInt(categoria_id));
-    where += ` AND p.categoria_id = $${params.length}`;
+  // Multi-category filter: categoria_ids takes precedence over categoria_id
+  const cats = categoria_ids
+    ? (Array.isArray(categoria_ids) ? categoria_ids : String(categoria_ids).split(','))
+        .map(Number).filter(n => !isNaN(n) && n > 0)
+    : categoria_id ? [parseInt(categoria_id)] : [];
+
+  if (cats.length > 0) {
+    params.push(cats);
+    where += ` AND p.categoria_id = ANY($${params.length}::int[])`;
   }
+
+  // Sort order
+  const orderBy =
+    sort_by === 'valorados' ? 'u.promedio_valoracion DESC NULLS LAST, p.created_at DESC' :
+    sort_by === 'creditos'  ? 'p.creditos_hora DESC, p.created_at DESC' :
+                              'p.created_at DESC';
 
   const dataQuery = `
     SELECT p.*,
@@ -41,10 +53,14 @@ const findAll = async ({ categoria_id, page = 1, limit = 10 } = {}) => {
     JOIN usuarios u ON u.id = p.usuario_id
     LEFT JOIN categorias c ON c.id = p.categoria_id
     WHERE ${where}
-    ORDER BY p.created_at DESC
+    ORDER BY ${orderBy}
     LIMIT $${params.length + 1} OFFSET $${params.length + 2}
   `;
-  const countQuery = `SELECT COUNT(*) FROM publicaciones p WHERE ${where}`;
+  const countQuery = `
+    SELECT COUNT(*) FROM publicaciones p
+    JOIN usuarios u ON u.id = p.usuario_id
+    WHERE ${where}
+  `;
 
   const [{ rows: data }, { rows: [{ count }] }] = await Promise.all([
     pool.query(dataQuery, [...params, safeLimit, offset]),

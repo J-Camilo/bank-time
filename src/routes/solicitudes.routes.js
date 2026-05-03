@@ -16,5 +16,7 @@ router.post('/', blocked, [
 ], ctrl.crear);
 router.post('/:id/aceptar',   ctrl.aceptar);
 router.post('/:id/rechazar',  ctrl.rechazar);
+router.patch('/:id',          ctrl.actualizar);
+router.delete('/:id',         ctrl.cancelar);
 
 module.exports = router;

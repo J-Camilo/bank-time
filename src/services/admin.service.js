@@ -92,10 +92,12 @@ const eliminarPublicacion = async (id) => {
 const getStats = async () => {
   const { rows: [stats] } = await pool.query(`
     SELECT
-      (SELECT COUNT(*) FROM usuarios WHERE activo = TRUE)             AS usuarios_activos,
-      (SELECT COUNT(*) FROM publicaciones WHERE estado = 'ABIERTO')   AS publicaciones_abiertas,
-      (SELECT COUNT(*) FROM intercambios WHERE estado = 'COMPLETADO') AS intercambios_completados,
-      (SELECT SUM(creditos_disponibles) FROM usuarios)                AS creditos_en_circulacion
+      (SELECT COUNT(*) FROM usuarios)                                    AS total_usuarios,
+      (SELECT COUNT(*) FROM usuarios WHERE activo = TRUE)                AS usuarios_activos,
+      (SELECT COUNT(*) FROM publicaciones)                               AS total_publicaciones,
+      (SELECT COUNT(*) FROM publicaciones WHERE estado = 'ABIERTO')     AS publicaciones_activas,
+      (SELECT COUNT(*) FROM intercambios)                                AS total_intercambios,
+      (SELECT COUNT(*) FROM intercambios WHERE estado = 'COMPLETADO')   AS intercambios_completados
   `);
   return stats;
 };
