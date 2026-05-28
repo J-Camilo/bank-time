@@ -96,17 +96,21 @@ const aceptar = async (solicitudId, usuarioId) => {
     if (solicitud.pub_owner !== usuarioId) throw new AppError('Sin permiso sobre esta solicitud', 403);
     if (solicitud.estado !== 'PENDIENTE')  throw new AppError('La solicitud ya fue procesada', 400);
 
-    // Check no overlapping intercambio for same publicacion + same date range
-    // (simple check — could be enhanced with time-slot collision detection)
+    // Check no overlapping intercambio for either participant
     if (solicitud.fecha_propuesta) {
+      const duracion    = solicitud.creditos_hora || 1;
+      const prestadorId = usuarioId;
+      const receptorId  = solicitud.usuario_id;
+
       const { rows: overlap } = await client.query(
         `SELECT id FROM intercambios
-         WHERE publicacion_id = $1
-           AND estado NOT IN ('CANCELADO')
-           AND ABS(EXTRACT(EPOCH FROM (fecha_acordada - $2::timestamptz)) / 3600) < 2`,
-        [solicitud.publicacion_id, solicitud.fecha_propuesta]
+         WHERE estado NOT IN ('CANCELADO', 'COMPLETADO')
+           AND (prestador_id = ANY($1) OR receptor_id = ANY($1))
+           AND fecha_acordada < ($2::timestamptz + $3 * INTERVAL '1 hour')
+           AND (fecha_acordada + creditos_acordados * INTERVAL '1 hour') > $2::timestamptz`,
+        [[prestadorId, receptorId], solicitud.fecha_propuesta, duracion]
       );
-      if (overlap.length) throw new AppError('Ya existe un intercambio en ese horario para esta publicación', 409);
+      if (overlap.length) throw new AppError('Uno de los participantes ya tiene un intercambio en ese horario', 409);
     }
 
     // ── Update solicitud ──────────────────────────────────────

@@ -14,4 +14,11 @@ const listarPorUsuario = async (req, res, next) => {
   } catch (e) { next(e); }
 };
 
-module.exports = { crear, listarPorUsuario };
+const porIntercambio = async (req, res, next) => {
+  try {
+    const data = await svc.porIntercambio(parseInt(req.params.id), req.user.id);
+    res.json(data);
+  } catch (e) { next(e); }
+};
+
+module.exports = { crear, listarPorUsuario, porIntercambio };

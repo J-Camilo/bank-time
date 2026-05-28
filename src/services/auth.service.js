@@ -34,13 +34,13 @@ const register = async ({ nombre, apellido, correo, contrasena, departamento, mu
 
   return withTransaction(async (client) => {
     const { rows: [user] } = await client.query(
-      `INSERT INTO usuarios (nombre, apellido, correo, contrasena, departamento, municipio, direccion)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO usuarios (nombre, apellido, correo, contrasena, departamento, municipio, direccion, creditos_disponibles)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 8)
        RETURNING id, nombre, apellido, correo, creditos_disponibles, created_at`,
       [nombre, apellido, correo, hash, departamento || null, municipio || null, direccion || null]
     );
 
-    // Audit credit assignment (DB already sets creditos_disponibles = 8 by default)
+    // Audit the initial credit assignment
     await asignarCreditosIniciales(client, user.id);
 
     return user;
