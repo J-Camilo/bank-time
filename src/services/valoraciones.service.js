@@ -43,4 +43,27 @@ const listarPorUsuario = async (usuarioId) => {
   return rows;
 };
 
-module.exports = { crear, listarPorUsuario };
+const porIntercambio = async (intercambioId, usuarioId) => {
+  const { rows: [intercambio] } = await pool.query(
+    'SELECT prestador_id, receptor_id FROM intercambios WHERE id = $1',
+    [intercambioId]
+  );
+  if (!intercambio) throw new AppError('Intercambio no encontrado', 404);
+  if (intercambio.prestador_id !== usuarioId && intercambio.receptor_id !== usuarioId) {
+    throw new AppError('Sin acceso a este intercambio', 403);
+  }
+
+  const { rows } = await pool.query(
+    `SELECT v.id, v.calificacion, v.comentario, v.fecha, v.usuario_id,
+            u.nombre  AS evaluador_nombre,  u.apellido  AS evaluador_apellido,
+            uv.nombre AS evaluado_nombre, uv.apellido AS evaluado_apellido
+     FROM valoraciones v
+     JOIN usuarios u  ON u.id  = v.usuario_id
+     JOIN usuarios uv ON uv.id = v.usuario_valorado_id
+     WHERE v.intercambio_id = $1`,
+    [intercambioId]
+  );
+  return rows;
+};
+
+module.exports = { crear, listarPorUsuario, porIntercambio };

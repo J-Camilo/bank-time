@@ -28,12 +28,59 @@ const findById = async (id, usuarioId) => {
 };
 
 const listarMios = async (usuarioId, { estado } = {}) => {
-  // Auto-transition: if fecha_acordada already passed, move EN_ESPERA → EN_CURSO
+  // Auto-transition 1: EN_ESPERA → EN_CURSO when scheduled time arrives
   await pool.query(
     `UPDATE intercambios
      SET estado = 'EN_CURSO'
      WHERE estado = 'EN_ESPERA' AND fecha_acordada <= NOW()`
   );
+
+  // Auto-transition 2: EN_CURSO → COMPLETADO when service duration has elapsed
+  // Duration = creditos_acordados hours after fecha_acordada
+  const { rows: overdue } = await pool.query(
+    `SELECT i.id
+     FROM intercambios i
+     LEFT JOIN historial_intercambio h ON h.intercambio_id = i.id
+     WHERE i.estado = 'EN_CURSO'
+       AND i.fecha_acordada + (i.creditos_acordados * INTERVAL '1 hour') < NOW()
+       AND h.id IS NULL`
+  );
+
+  for (const { id } of overdue) {
+    try {
+      await withTransaction(async (client) => {
+        const { rowCount } = await client.query(
+          `UPDATE intercambios
+           SET estado = 'COMPLETADO', confirmacion_prestador = TRUE, confirmacion_receptor = TRUE
+           WHERE id = $1 AND estado = 'EN_CURSO'`,
+          [id]
+        );
+        if (rowCount === 0) return; // already handled by another request
+
+        await creditos.liquidarIntercambio(client, id);
+
+        const { rows: [i] } = await client.query(
+          'SELECT prestador_id, receptor_id FROM intercambios WHERE id = $1',
+          [id]
+        );
+        const msg = `El intercambio #${id} fue completado automáticamente al vencer el tiempo acordado.`;
+        await notif.crearNotificacion(client, {
+          usuarioId: i.prestador_id,
+          titulo: '✅ Intercambio completado',
+          mensaje: msg,
+          intercambioId: id,
+        });
+        await notif.crearNotificacion(client, {
+          usuarioId: i.receptor_id,
+          titulo: '✅ Intercambio completado',
+          mensaje: msg,
+          intercambioId: id,
+        });
+      });
+    } catch (e) {
+      console.error(`Auto-complete intercambio #${id}:`, e.message);
+    }
+  }
 
   const params = [usuarioId];
   let filter = '';
