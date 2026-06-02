@@ -15,18 +15,41 @@ const crear = async (usuarioId, { intercambio_id, calificacion, comentario }) =>
 
   const usuario_valorado_id = esPrestador ? intercambio.receptor_id : intercambio.prestador_id;
 
-  try {
-    const { rows: [valoracion] } = await pool.query(
-      `INSERT INTO valoraciones (intercambio_id, usuario_id, usuario_valorado_id, calificacion, comentario)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING *`,
-      [intercambio_id, usuarioId, usuario_valorado_id, calificacion, comentario || null]
+  const { withTransaction } = require('../config/db');
+  return withTransaction(async (client) => {
+    let valoracion;
+    try {
+      const { rows: [v] } = await client.query(
+        `INSERT INTO valoraciones (intercambio_id, usuario_id, usuario_valorado_id, calificacion, comentario)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING *`,
+        [intercambio_id, usuarioId, usuario_valorado_id, calificacion, comentario || null]
+      );
+      valoracion = v;
+    } catch (e) {
+      if (e.code === '23505') throw new AppError('Ya valoraste este intercambio', 409);
+      throw e;
+    }
+
+    // Recalcular promedio real del usuario valorado
+    await client.query(
+      `UPDATE usuarios
+       SET promedio_valoracion = (
+             SELECT ROUND(AVG(calificacion)::numeric, 1)
+             FROM valoraciones
+             WHERE usuario_valorado_id = $1
+           ),
+           total_valoraciones = (
+             SELECT COUNT(*)
+             FROM valoraciones
+             WHERE usuario_valorado_id = $1
+           )
+       WHERE id = $1`,
+      [usuario_valorado_id]
     );
+
     return valoracion;
-  } catch (e) {
-    if (e.code === '23505') throw new AppError('Ya valoraste este intercambio', 409);
-    throw e;
-  }
+  });
 };
 
 const listarPorUsuario = async (usuarioId) => {

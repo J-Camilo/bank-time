@@ -11,14 +11,16 @@ router.get('/', ctrl.list);
 // ── Protected ─────────────────────────────────────────────────
 router.get('/mis',    auth, blocked, ctrl.getMine);   // ?expired=true para incluir expiradas
 
-router.get('/:id',         ctrl.getById);
-router.get('/:id/matches', auth, ctrl.getMatches);
+router.get('/:id',                ctrl.getById);
+router.get('/:id/matches',        auth, ctrl.getMatches);
+router.get('/:id/disponibilidad', auth, ctrl.getDisponibilidad);
 
 router.post('/', auth, blocked, [
   body('titulo').trim().notEmpty().withMessage('Título requerido'),
   body('descripcion').trim().notEmpty().withMessage('Descripción requerida'),
   body('fecha_expiracion').isDate().withMessage('Fecha de expiración inválida (YYYY-MM-DD)'),
   body('creditos_hora').optional().isInt({ min: 1 }).withMessage('creditos_hora debe ser entero positivo'),
+  body('duracion_horas').optional().isInt({ min: 1, max: 24 }).withMessage('duracion_horas debe ser entre 1 y 24'),
   body('categoria_id').optional().isInt({ min: 1 }),
 ], ctrl.create);
 

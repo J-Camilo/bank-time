@@ -6,15 +6,15 @@ const autoExpirar = () =>
   pool.query(`UPDATE publicaciones SET estado = 'EXPIRADO'
               WHERE estado = 'ABIERTO' AND fecha_expiracion < CURRENT_DATE`);
 
-const create = async (usuarioId, { titulo, descripcion, categoria_id, fecha_expiracion, creditos_hora = 1 }) => {
+const create = async (usuarioId, { titulo, descripcion, categoria_id, fecha_expiracion, creditos_hora = 1, duracion_horas = 1 }) => {
   if (!categoria_id || !Number.isInteger(Number(categoria_id))) {
     throw new AppError('categoria_id es requerida y debe ser un número válido', 400);
   }
   const { rows: [pub] } = await pool.query(
-    `INSERT INTO publicaciones (titulo, descripcion, categoria_id, fecha_expiracion, creditos_hora, usuario_id)
-     VALUES ($1, $2, $3, $4, $5, $6)
+    `INSERT INTO publicaciones (titulo, descripcion, categoria_id, fecha_expiracion, creditos_hora, duracion_horas, usuario_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
      RETURNING *`,
-    [titulo, descripcion, Number(categoria_id), fecha_expiracion, creditos_hora, usuarioId]
+    [titulo, descripcion, Number(categoria_id), fecha_expiracion, creditos_hora, Math.max(1, parseInt(duracion_horas) || 1), usuarioId]
   );
   return pub;
 };
@@ -47,7 +47,11 @@ const findAll = async ({ categoria_id, categoria_ids, page = 1, limit = 10, sort
 
   const dataQuery = `
     SELECT p.*,
-           u.nombre, u.apellido, u.promedio_valoracion,
+           u.nombre, u.apellido,
+           (SELECT ROUND(AVG(v.calificacion)::numeric, 1)
+            FROM valoraciones v WHERE v.usuario_valorado_id = u.id) AS promedio_valoracion,
+           (SELECT COUNT(*)::int
+            FROM valoraciones v WHERE v.usuario_valorado_id = u.id) AS total_valoraciones,
            c.nombre AS categoria_nombre
     FROM publicaciones p
     JOIN usuarios u ON u.id = p.usuario_id
@@ -74,7 +78,11 @@ const findById = async (id) => {
   await autoExpirar();
   const { rows: [pub] } = await pool.query(
     `SELECT p.*,
-            u.nombre, u.apellido, u.promedio_valoracion,
+            u.nombre, u.apellido,
+            (SELECT ROUND(AVG(v.calificacion)::numeric, 1)
+             FROM valoraciones v WHERE v.usuario_valorado_id = u.id) AS promedio_valoracion,
+            (SELECT COUNT(*)::int
+             FROM valoraciones v WHERE v.usuario_valorado_id = u.id) AS total_valoraciones,
             c.nombre AS categoria_nombre
      FROM publicaciones p
      JOIN usuarios u ON u.id = p.usuario_id
@@ -108,7 +116,7 @@ const update = async (id, usuarioId, fields) => {
   if (pub.usuario_id !== usuarioId) throw new AppError('Sin permiso para editar esta publicación', 403);
   if (pub.estado !== 'ABIERTO') throw new AppError('Solo se pueden editar publicaciones abiertas', 400);
 
-  const allowed = ['titulo', 'descripcion', 'categoria_id', 'fecha_expiracion', 'creditos_hora'];
+  const allowed = ['titulo', 'descripcion', 'categoria_id', 'fecha_expiracion', 'creditos_hora', 'duracion_horas'];
   const updates = Object.entries(fields).filter(([k, v]) => allowed.includes(k) && v !== undefined);
   if (!updates.length) throw new AppError('No hay campos válidos para actualizar', 400);
 
@@ -139,4 +147,35 @@ const remove = async (id, usuarioId) => {
   await pool.query('DELETE FROM publicaciones WHERE id = $1', [id]);
 };
 
-module.exports = { create, findAll, findById, findByUser, update, remove };
+/**
+ * Returns occupied time slots for a given publication on a specific date.
+ * Used by the frontend to show available hours before booking.
+ */
+const getDisponibilidad = async (publicacionId, fecha) => {
+  const { rows: [pub] } = await pool.query(
+    'SELECT duracion_horas FROM publicaciones WHERE id = $1',
+    [publicacionId]
+  );
+  if (!pub) throw new AppError('Publicación no encontrada', 404);
+
+  const { rows: ocupados } = await pool.query(
+    `SELECT fecha_acordada AS inicio,
+            fecha_acordada + (creditos_acordados * INTERVAL '1 hour') AS fin
+     FROM intercambios
+     WHERE publicacion_id = $1
+       AND DATE(fecha_acordada AT TIME ZONE 'UTC') = $2::date
+       AND estado NOT IN ('CANCELADO', 'COMPLETADO')
+     ORDER BY fecha_acordada`,
+    [publicacionId, fecha]
+  );
+
+  return {
+    duracion_horas: pub.duracion_horas,
+    ocupados: ocupados.map(r => ({
+      inicio: r.inicio,
+      fin:    r.fin,
+    })),
+  };
+};
+
+module.exports = { create, findAll, findById, findByUser, update, remove, getDisponibilidad };

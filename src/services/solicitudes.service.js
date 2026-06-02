@@ -2,16 +2,20 @@ const { pool, withTransaction } = require('../config/db');
 const { AppError }              = require('../middlewares/errorHandler');
 const notif                     = require('./notificaciones.service');
 
-const crear = async (usuarioId, { publicacion_id, mensaje, fecha_propuesta }) => {
+const crear = async (usuarioId, { publicacion_id, mensaje, fecha_propuesta, horas_solicitadas }) => {
   return withTransaction(async (client) => {
     // ── Validate publication ──────────────────────────────────
     const { rows: [pub] } = await client.query(
-      'SELECT id, usuario_id, estado, titulo, creditos_hora FROM publicaciones WHERE id = $1 FOR SHARE',
+      'SELECT id, usuario_id, estado, titulo, creditos_hora, duracion_horas FROM publicaciones WHERE id = $1 FOR SHARE',
       [publicacion_id]
     );
     if (!pub)                         throw new AppError('Publicación no encontrada', 404);
     if (pub.estado !== 'ABIERTO')     throw new AppError('Publicación no está disponible', 400);
     if (pub.usuario_id === usuarioId) throw new AppError('No puedes solicitar tu propia publicación', 400);
+
+    const duracionMax = pub.duracion_horas || 1;
+    const horasSol   = Math.min(Math.max(1, parseInt(horas_solicitadas) || 1), duracionMax);
+    const costoTotal = pub.creditos_hora * horasSol;
 
     // ── Validate requester ────────────────────────────────────
     const { rows: [usr] } = await client.query(
@@ -21,8 +25,8 @@ const crear = async (usuarioId, { publicacion_id, mensaje, fecha_propuesta }) =>
     if (usr.fecha_bloqueo_hasta && new Date(usr.fecha_bloqueo_hasta) > new Date()) {
       throw new AppError('Tu cuenta está bloqueada temporalmente', 403);
     }
-    if (usr.creditos_disponibles < (pub.creditos_hora || 1)) {
-      throw new AppError('Créditos insuficientes para solicitar este servicio', 400);
+    if (usr.creditos_disponibles < costoTotal) {
+      throw new AppError(`Créditos insuficientes — necesitás ${costoTotal} crédito(s) para ${horasSol} hora(s) de servicio`, 400);
     }
 
     // ── Check no active pending solicitud ─────────────────────
@@ -33,12 +37,27 @@ const crear = async (usuarioId, { publicacion_id, mensaje, fecha_propuesta }) =>
     );
     if (existing) throw new AppError('Ya tenés una solicitud pendiente para esta publicación', 409);
 
+    // ── Check availability for requested slot ─────────────────
+    if (fecha_propuesta) {
+      const { rows: overlap } = await client.query(
+        `SELECT id FROM intercambios
+         WHERE publicacion_id = $1
+           AND estado NOT IN ('CANCELADO', 'COMPLETADO')
+           AND fecha_acordada < ($2::timestamptz + $3 * INTERVAL '1 hour')
+           AND (fecha_acordada + creditos_acordados * INTERVAL '1 hour') > $2::timestamptz`,
+        [publicacion_id, fecha_propuesta, horasSol]
+      );
+      if (overlap.length) {
+        throw new AppError('El horario solicitado ya está ocupado para este servicio. Elegí otro horario disponible.', 409);
+      }
+    }
+
     // ── Create solicitud ──────────────────────────────────────
     const { rows: [solicitud] } = await client.query(
-      `INSERT INTO solicitud_interes (publicacion_id, usuario_id, mensaje, fecha_propuesta)
-       VALUES ($1, $2, $3, $4)
+      `INSERT INTO solicitud_interes (publicacion_id, usuario_id, mensaje, fecha_propuesta, horas_solicitadas)
+       VALUES ($1, $2, $3, $4, $5)
        RETURNING *`,
-      [publicacion_id, usuarioId, mensaje || null, fecha_propuesta || null]
+      [publicacion_id, usuarioId, mensaje || null, fecha_propuesta || null, horasSol]
     );
 
     // ── Notify publication owner ──────────────────────────────
@@ -85,7 +104,7 @@ const listarEnviadas = async (usuarioId) => {
 const aceptar = async (solicitudId, usuarioId) => {
   return withTransaction(async (client) => {
     const { rows: [solicitud] } = await client.query(
-      `SELECT si.*, p.usuario_id AS pub_owner, p.titulo, p.creditos_hora
+      `SELECT si.*, p.usuario_id AS pub_owner, p.titulo, p.creditos_hora, p.duracion_horas
        FROM solicitud_interes si
        JOIN publicaciones p ON p.id = si.publicacion_id
        WHERE si.id = $1
@@ -96,9 +115,12 @@ const aceptar = async (solicitudId, usuarioId) => {
     if (solicitud.pub_owner !== usuarioId) throw new AppError('Sin permiso sobre esta solicitud', 403);
     if (solicitud.estado !== 'PENDIENTE')  throw new AppError('La solicitud ya fue procesada', 400);
 
+    // horas_solicitadas define la duración real del intercambio
+    const horasSol    = solicitud.horas_solicitadas || 1;
+    const costoTotal  = (solicitud.creditos_hora || 1) * horasSol;
+
     // Check no overlapping intercambio for either participant
     if (solicitud.fecha_propuesta) {
-      const duracion    = solicitud.creditos_hora || 1;
       const prestadorId = usuarioId;
       const receptorId  = solicitud.usuario_id;
 
@@ -108,7 +130,7 @@ const aceptar = async (solicitudId, usuarioId) => {
            AND (prestador_id = ANY($1) OR receptor_id = ANY($1))
            AND fecha_acordada < ($2::timestamptz + $3 * INTERVAL '1 hour')
            AND (fecha_acordada + creditos_acordados * INTERVAL '1 hour') > $2::timestamptz`,
-        [[prestadorId, receptorId], solicitud.fecha_propuesta, duracion]
+        [[prestadorId, receptorId], solicitud.fecha_propuesta, horasSol]
       );
       if (overlap.length) throw new AppError('Uno de los participantes ya tiene un intercambio en ese horario', 409);
     }
@@ -119,7 +141,7 @@ const aceptar = async (solicitudId, usuarioId) => {
       [solicitudId]
     );
 
-    // ── Create intercambio ────────────────────────────────────
+    // ── Create intercambio — creditos_acordados = costo total por las horas elegidas ──
     const { rows: [intercambio] } = await client.query(
       `INSERT INTO intercambios
          (fecha_acordada, creditos_acordados, publicacion_id, prestador_id, receptor_id, solicitud_id)
@@ -127,7 +149,7 @@ const aceptar = async (solicitudId, usuarioId) => {
        RETURNING *`,
       [
         solicitud.fecha_propuesta || new Date(),
-        solicitud.creditos_hora || 1,
+        costoTotal,
         solicitud.publicacion_id,
         usuarioId,            // publisher = prestador del servicio
         solicitud.usuario_id, // requester = receptor del servicio
