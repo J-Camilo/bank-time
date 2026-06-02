@@ -47,7 +47,7 @@ const findAll = async ({ categoria_id, categoria_ids, page = 1, limit = 10, sort
 
   const dataQuery = `
     SELECT p.*,
-           u.nombre, u.apellido, u.promedio_valoracion,
+           u.nombre, u.apellido, u.promedio_valoracion, u.total_valoraciones,
            c.nombre AS categoria_nombre
     FROM publicaciones p
     JOIN usuarios u ON u.id = p.usuario_id
