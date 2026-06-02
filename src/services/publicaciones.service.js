@@ -50,7 +50,7 @@ const findAll = async ({ categoria_id, categoria_ids, page = 1, limit = 10, sort
            u.nombre, u.apellido,
            (SELECT ROUND(AVG(v.calificacion)::numeric, 1)
             FROM valoraciones v WHERE v.usuario_valorado_id = u.id) AS promedio_valoracion,
-           (SELECT COUNT(*)
+           (SELECT COUNT(*)::int
             FROM valoraciones v WHERE v.usuario_valorado_id = u.id) AS total_valoraciones,
            c.nombre AS categoria_nombre
     FROM publicaciones p
@@ -81,7 +81,7 @@ const findById = async (id) => {
             u.nombre, u.apellido,
             (SELECT ROUND(AVG(v.calificacion)::numeric, 1)
              FROM valoraciones v WHERE v.usuario_valorado_id = u.id) AS promedio_valoracion,
-            (SELECT COUNT(*)
+            (SELECT COUNT(*)::int
              FROM valoraciones v WHERE v.usuario_valorado_id = u.id) AS total_valoraciones,
             c.nombre AS categoria_nombre
      FROM publicaciones p
