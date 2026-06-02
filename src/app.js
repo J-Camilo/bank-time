@@ -24,7 +24,7 @@ app.use(cors({
 // ── Global rate limit (100 req / 15 min / IP) ────────────────
 app.use(rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: 500,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Demasiadas solicitudes. Intenta más tarde.' },

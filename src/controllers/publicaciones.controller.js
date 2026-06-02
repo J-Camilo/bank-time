@@ -52,4 +52,13 @@ const getMatches = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-module.exports = { create, list, getById, getMine, update, remove, getMatches };
+const getDisponibilidad = async (req, res, next) => {
+  try {
+    const { fecha } = req.query;
+    if (!fecha) return res.status(400).json({ error: 'El parámetro fecha (YYYY-MM-DD) es requerido' });
+    const result = await pubService.getDisponibilidad(parseInt(req.params.id), fecha);
+    res.json(result);
+  } catch (err) { next(err); }
+};
+
+module.exports = { create, list, getById, getMine, update, remove, getMatches, getDisponibilidad };
