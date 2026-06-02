@@ -47,7 +47,11 @@ const findAll = async ({ categoria_id, categoria_ids, page = 1, limit = 10, sort
 
   const dataQuery = `
     SELECT p.*,
-           u.nombre, u.apellido, u.promedio_valoracion, u.total_valoraciones,
+           u.nombre, u.apellido,
+           (SELECT ROUND(AVG(v.calificacion)::numeric, 1)
+            FROM valoraciones v WHERE v.usuario_valorado_id = u.id) AS promedio_valoracion,
+           (SELECT COUNT(*)
+            FROM valoraciones v WHERE v.usuario_valorado_id = u.id) AS total_valoraciones,
            c.nombre AS categoria_nombre
     FROM publicaciones p
     JOIN usuarios u ON u.id = p.usuario_id
@@ -74,7 +78,11 @@ const findById = async (id) => {
   await autoExpirar();
   const { rows: [pub] } = await pool.query(
     `SELECT p.*,
-            u.nombre, u.apellido, u.promedio_valoracion,
+            u.nombre, u.apellido,
+            (SELECT ROUND(AVG(v.calificacion)::numeric, 1)
+             FROM valoraciones v WHERE v.usuario_valorado_id = u.id) AS promedio_valoracion,
+            (SELECT COUNT(*)
+             FROM valoraciones v WHERE v.usuario_valorado_id = u.id) AS total_valoraciones,
             c.nombre AS categoria_nombre
      FROM publicaciones p
      JOIN usuarios u ON u.id = p.usuario_id
